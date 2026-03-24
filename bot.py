@@ -33,17 +33,17 @@ BOT_TOKEN         = "8415663762:AAFNXnnhyJGiOJzXA6gQHlaW1NJG_jIJ-PU"
 ADMIN_ID          = 6683331082
 DB_FILE           = "ff_bot_data.json"
 TOKEN_LOG         = "access_tokens.txt"
-VERSION           = "3.0.0"
+VERSION           = "5.5.6"
 VIP_CONTACT       = "@liggdzut1"
 
 BANK_STK          = "0962835186"
 BANK_NAME         = "MoMo"
-BANK_OWNER        = "Nguyen Van A"   # ← đổi tên chủ tài khoản
+BANK_OWNER        = "Nguyen Thi Luyen"   # ← đổi tên chủ tài khoản
 FREE_KEY_INTERVAL = 5 * 3600
 GARENA_HEADERS    = {"User-Agent": "GarenaMSDK/4.0.30 (iPhone9,1;ios - 15.8.6;vi-US;US)"}
 UPDATE_API_URL    = "https://servervip.x10.mx/api.php"
 FF_INFO_API       = "http://203.57.85.58:2005/player-info?uid={uid}&key=@yashapis"
-SPAM_INTERVAL     = 4   # Giây giữa mỗi lần gửi packet
+SPAM_INTERVAL     = 50   # Giây giữa mỗi lần gửi packet
 REQUIRED_GROUPS   = ["@botsiuvip22", "@h4ckcheatvip", "@bonchatcommunity1109"]
 
 active_spams        = {}
