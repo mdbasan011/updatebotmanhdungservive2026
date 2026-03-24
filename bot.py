@@ -29,7 +29,7 @@ from ReQAPI import FreeFireAPI
 #                     CẤU HÌNH
 # ══════════════════════════════════════════════════════
 BOT_NAME          = "Bon Service 👹"
-BOT_TOKEN         = "8616571597:AAHZCvi84k5VKdWA82PFlTex657sV1RwO9s"
+BOT_TOKEN         = "8415663762:AAG0i_pttwTHHdYHuAk57hJI8WkG0ozCztU"
 ADMIN_ID          = 6683331082
 DB_FILE           = "ff_bot_data.json"
 TOKEN_LOG         = "access_tokens.txt"
