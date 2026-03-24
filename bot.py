@@ -38,7 +38,7 @@ VIP_CONTACT       = "@liggdzut1"
 
 BANK_STK          = "0962835186"
 BANK_NAME         = "MoMo"
-BANK_OWNER        = "Nguyen Van A"   # ← đổi tên chủ tài khoản
+BANK_OWNER        = "Nguyen Thi Luyen"   # ← đổi tên chủ tài khoản
 FREE_KEY_INTERVAL = 5 * 3600
 GARENA_HEADERS    = {"User-Agent": "GarenaMSDK/4.0.30 (iPhone9,1;ios - 15.8.6;vi-US;US)"}
 UPDATE_API_URL    = "https://servervip.x10.mx/api.php"
