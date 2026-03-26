@@ -82,7 +82,7 @@ BOT_TOKEN = "8415663762:AAFNXnnhyJGiOJzXA6gQHlaW1NJG_jIJ-PU"
 ADMIN_ID = 6683331082
 DB_FILE = "ff_bot_data.json"
 TOKEN_LOG = "access_tokens.txt"
-VERSION = "5.5.10"
+VERSION = "5.6.0"
 VIP_CONTACT = "@liggdzut1"
 
 BANK_STK = "0368925982"
