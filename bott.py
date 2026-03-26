@@ -82,7 +82,7 @@ BOT_TOKEN = "8415663762:AAFNXnnhyJGiOJzXA6gQHlaW1NJG_jIJ-PU"
 ADMIN_ID = 6683331082
 DB_FILE = "ff_bot_data.json"
 TOKEN_LOG = "access_tokens.txt"
-VERSION = "5.5.8"
+VERSION = "5.5.9"
 VIP_CONTACT = "@liggdzut1"
 
 BANK_STK = "0368925982"
@@ -578,11 +578,12 @@ async def fetch_ff_info(uid_ff: str) -> str:
             pet = data.get("petInfo", {})
             si = data.get("socialInfo", {})
             cs = data.get("creditScoreInfo", {})
+            pf = data.get("profileInfo", {})
 
             rank_map = {
                 200: "Đồng", 201: "Bạc", 202: "Vàng", 203: "Bạch Kim",
                 204: "Kim Cương", 205: "Heroic", 206: "Grand Master",
-                220: "Cao thủ", 221: "Thách Đấu"
+                300: "Huyền Thoại"
             }
 
             def rank_name(r):
@@ -592,29 +593,48 @@ async def fetch_ff_info(uid_ff: str) -> str:
             clan = cl.get("clanName", "Không có") if cl else "Không có"
             pet_name = pet.get("name", "Không có") if pet else "Không có"
 
+            # convert time
+            import datetime
+            def fmt_time(ts):
+                try:
+                    return datetime.datetime.fromtimestamp(int(ts)).strftime("%d/%m/%Y %H:%M")
+                except:
+                    return "?"
+
+            last_login = fmt_time(bi.get("lastLoginAt", 0))
+            created = fmt_time(bi.get("createAt", 0))
+
             return (
                 f"```\n"
                 f"┌───⭓ THÔNG TIN NICK FF\n"
                 f"│\n"
-                f"│  👤  Nick     :  {bi.get('nickname', '?')}\n"
-                f"│  🆔  UID      :  {bi.get('accountId', '?')}\n"
-                f"│  🌍  Region   :  {bi.get('region', 'VN')}\n"
-                f"│  ⚡  Level    :  {bi.get('level', '?')}\n"
+                f"│  👤  Nick      : {bi.get('nickname', '?')}\n"
+                f"│  🆔  UID       : {bi.get('accountId', '?')}\n"
+                f"│  🌍  Region    : {bi.get('region', 'VN')}\n"
+                f"│  ⚡  Level     : {bi.get('level', '?')} ({bi.get('exp', 0):,} EXP)\n"
                 f"│  ❤️  Lượt thích: {bi.get('liked', 0):,}\n"
-                f"│  🏆  BR Rank  :  {rank_name(bi.get('rank', 0))}\n"
-                f"│  🎯  CS Rank  :  {rank_name(bi.get('csRank', 0))}\n"
-                f"│  {gender}  Giới tính\n"
-                f"│  🏰  Guild    :  {clan}\n"
-                f"│  🐾  Pet      :  {pet_name}\n"
-                f"│  ⭐  Credit   :  {cs.get('creditScore', '?')}\n"
-                f"│  🎮  Version  :  {bi.get('releaseVersion', '?')}\n"
+                f"│\n"
+                f"│  🏆  BR Rank   : {rank_name(bi.get('rank', 0))} ({bi.get('rankingPoints', 0)}đ)\n"
+                f"│  🎯  CS Rank   : {rank_name(bi.get('csRank', 0))}\n"
+                f"│  🔥  Max Rank  : {rank_name(bi.get('maxRank', 0))}\n"
+                f"│\n"
+                f"│  {gender}\n"
+                f"│  🏰  Guild     : {clan}\n"
+                f"│  🐾  Pet       : {pet_name} (Lv.{pet.get('level', 0)})\n"
+                f"│\n"
+                f"│  ✍️  Bio       : {si.get('signature', 'Không có')}\n"
+                f"│  ⭐  Credit    : {cs.get('creditScore', '?')}\n"
+                f"│\n"
+                f"│  🕒  Tạo acc   : {created}\n"
+                f"│  🕒  Login cuối: {last_login}\n"
+                f"│\n"
+                f"│  🎮  Version   : {bi.get('releaseVersion', '?')}\n"
                 f"└──────────────────\n"
                 f"```"
             )
 
         except Exception as e:
-            return f"```\n❌  Lỗi: {str(e)[:100]}\n```"
-
+            return f"```\n❌ Lỗi: {str(e)[:100]}\n```"
 # ══════════════════════════════════════════════════════
 #               XUẤT FILE TOKENS
 # ══════════════════════════════════════════════════════
