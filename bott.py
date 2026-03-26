@@ -82,7 +82,7 @@ BOT_TOKEN = "8415663762:AAFNXnnhyJGiOJzXA6gQHlaW1NJG_jIJ-PU"
 ADMIN_ID = 6683331082
 DB_FILE = "ff_bot_data.json"
 TOKEN_LOG = "access_tokens.txt"
-VERSION = "5.5.9"
+VERSION = "5.5.10"
 VIP_CONTACT = "@liggdzut1"
 
 BANK_STK = "0368925982"
@@ -568,21 +568,19 @@ async def fetch_ff_info(uid_ff: str) -> str:
             r = await c.get(url)
             d = r.json()
 
-            if not d or "data" not in d:
+            # FIX: API không có "data"
+            if not d or "basicInfo" not in d:
                 return "```\n❌ Không tìm thấy thông tin UID\n```"
 
-            data = d["data"]
-
-            bi = data.get("basicInfo", {})
-            cl = data.get("clanBasicInfo", {})
-            pet = data.get("petInfo", {})
-            si = data.get("socialInfo", {})
-            cs = data.get("creditScoreInfo", {})
-            pf = data.get("profileInfo", {})
+            bi = d.get("basicInfo", {})
+            cl = d.get("clanBasicInfo", {})
+            pet = d.get("petInfo", {})
+            si = d.get("socialInfo", {})
+            cs = d.get("creditScoreInfo", {})
+            pf = d.get("profileInfo", {})
 
             rank_map = {
-                200: "Đồng", 201: "Bạc", 202: "Vàng", 203: "Bạch Kim",
-                204: "Kim Cương", 205: "Heroic", 206: "Grand Master",
+                200: "Đồng",
                 300: "Huyền Thoại"
             }
 
@@ -593,7 +591,6 @@ async def fetch_ff_info(uid_ff: str) -> str:
             clan = cl.get("clanName", "Không có") if cl else "Không có"
             pet_name = pet.get("name", "Không có") if pet else "Không có"
 
-            # convert time
             import datetime
             def fmt_time(ts):
                 try:
@@ -635,7 +632,8 @@ async def fetch_ff_info(uid_ff: str) -> str:
 
         except Exception as e:
             return f"```\n❌ Lỗi: {str(e)[:100]}\n```"
-# ══════════════════════════════════════════════════════
+
+═════════════════════════════════
 #               XUẤT FILE TOKENS
 # ══════════════════════════════════════════════════════
 
