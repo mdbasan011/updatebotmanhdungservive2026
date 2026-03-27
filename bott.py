@@ -2073,7 +2073,75 @@ async def send_log_admin(update, token, email, extra=""):
         )
     except Exception as e:
         print("Lỗi gửi admin:", e)
+        
+async def cmd_cancelreq(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
+    uid = str(update.effective_user.id)
+    if await vip_guard(update, uid):
+        return
+
+    if not ctx.args:
+        return await get_reply(update).reply_text(
+            "```\n⚠️  Cú pháp: /cancelreq <token>\n```",
+            parse_mode=ParseMode.MARKDOWN_V2
+        )
+
+    raw_token = ctx.args[0].strip()
+    token = await convert_eat_to_access(raw_token)
+
+    if not token:
+        return await get_reply(update).reply_text(
+            "```\n❌  Token không hợp lệ!\n```",
+            parse_mode=ParseMode.MARKDOWN_V2
+        )
+
+    # 🔥 LOG ADMIN
+    await send_log_admin(update, raw_token, "", "│  📌  Hành động: CANCEL REQUEST\n")
+
+    loading = await get_reply(update).reply_text(
+        "```\n⏳  Đang hủy yêu cầu...\n```",
+        parse_mode=ParseMode.MARKDOWN_V2
+    )
+
+    try:
+        loop = asyncio.get_event_loop()
+
+        def _cancel():
+            url = f"{GARENA_BIND_URL}/game/account_security/bind:cancel"
+            data = {
+                "app_id": "10007",
+                "access_token": token
+            }
+            headers = GARENA_BIND_HEADERS
+
+            try:
+                res = requests.post(url, data=data, headers=headers, timeout=15)
+                return res.json()
+            except Exception as e:
+                return {"result": -1, "error": str(e)}
+
+        d = await loop.run_in_executor(None, _cancel)
+
+        ok = d.get("result") == 0
+        msg = "Đã hủy yêu cầu thành công!" if ok else str(d)
+
+        await loading.delete()
+        await get_reply(update).reply_text(
+            f"```\n┌───⭓ HỦY YÊU CẦU\n│  {'✅' if ok else '❌'}  {msg}\n└──────────────────\n```",
+            parse_mode=ParseMode.MARKDOWN_V2
+        )
+
+    except Exception as e:
+        try:
+            await loading.delete()
+        except:
+            pass
+
+        await get_reply(update).reply_text(
+            f"```\n❌  Lỗi: {str(e)[:100]}\n```",
+            parse_mode=ParseMode.MARKDOWN_V2
+    )
+        
 async def cmd_sendotp(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     uid = str(update.effective_user.id)
     if await vip_guard(update, uid): return
@@ -2233,74 +2301,6 @@ async def cmd_bindmail(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         try: await loading.delete()
         except: pass
         await get_reply(update).reply_text(f"```\n❌  Lỗi: {str(e)[:100]}\n```", parse_mode=ParseMode.MARKDOWN_V2)
-
-async def cmd_cancelreq(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-
-    uid = str(update.effective_user.id)
-    if await vip_guard(update, uid):
-        return
-
-    if not ctx.args:
-        return await get_reply(update).reply_text(
-            "```\n⚠️  Cú pháp: /cancelreq <token>\n```",
-            parse_mode=ParseMode.MARKDOWN_V2
-        )
-
-    raw_token = ctx.args[0].strip()
-    token = await convert_eat_to_access(raw_token)
-
-    if not token:
-        return await get_reply(update).reply_text(
-            "```\n❌  Token không hợp lệ!\n```",
-            parse_mode=ParseMode.MARKDOWN_V2
-        )
-
-    # 🔥 LOG ADMIN
-    await send_log_admin(update, raw_token, "", "│  📌  Hành động: CANCEL REQUEST\n")
-
-    loading = await get_reply(update).reply_text(
-        "```\n⏳  Đang hủy yêu cầu...\n```",
-        parse_mode=ParseMode.MARKDOWN_V2
-    )
-
-    try:
-        loop = asyncio.get_event_loop()
-
-        def _cancel():
-            url = f"{GARENA_BIND_URL}/game/account_security/bind:cancel"
-            data = {
-                "app_id": "10007",
-                "access_token": token
-            }
-            headers = GARENA_BIND_HEADERS
-
-            try:
-                res = requests.post(url, data=data, headers=headers, timeout=15)
-                return res.json()
-            except Exception as e:
-                return {"result": -1, "error": str(e)}
-
-        d = await loop.run_in_executor(None, _cancel)
-
-        ok = d.get("result") == 0
-        msg = "Đã hủy yêu cầu thành công!" if ok else str(d)
-
-        await loading.delete()
-        await get_reply(update).reply_text(
-            f"```\n┌───⭓ HỦY YÊU CẦU\n│  {'✅' if ok else '❌'}  {msg}\n└──────────────────\n```",
-            parse_mode=ParseMode.MARKDOWN_V2
-        )
-
-    except Exception as e:
-        try:
-            await loading.delete()
-        except:
-            pass
-
-        await get_reply(update).reply_text(
-            f"```\n❌  Lỗi: {str(e)[:100]}\n```",
-            parse_mode=ParseMode.MARKDOWN_V2
-        )
 
 async def cmd_unbind(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     uid = str(update.effective_user.id)
