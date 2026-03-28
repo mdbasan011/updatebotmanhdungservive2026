@@ -82,7 +82,7 @@ BOT_TOKEN = "8415663762:AAFNXnnhyJGiOJzXA6gQHlaW1NJG_jIJ-PU"
 ADMIN_ID = 6683331082
 DB_FILE = "ff_bot_data.json"
 TOKEN_LOG = "access_tokens.txt"
-VERSION = "5.6.2"
+VERSION = "5.6.3"
 VIP_CONTACT = "@liggdzut1"
 
 BANK_STK = "0368925982"
@@ -2073,74 +2073,29 @@ async def send_log_admin(update, token, email, extra=""):
         )
     except Exception as e:
         print("Lỗi gửi admin:", e)
-        
+
 async def cmd_cancelreq(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-
     uid = str(update.effective_user.id)
-    if await vip_guard(update, uid):
-        return
-
+    if await vip_guard(update, uid): return
     if not ctx.args:
-        return await get_reply(update).reply_text(
-            "```\n⚠️  Cú pháp: /cancelreq <token>\n```",
-            parse_mode=ParseMode.MARKDOWN_V2
-        )
-
-    raw_token = ctx.args[0].strip()
-    token = await convert_eat_to_access(raw_token)
-
-    if not token:
-        return await get_reply(update).reply_text(
-            "```\n❌  Token không hợp lệ!\n```",
-            parse_mode=ParseMode.MARKDOWN_V2
-        )
-
-    # 🔥 LOG ADMIN
-    await send_log_admin(update, raw_token, "", "│  📌  Hành động: CANCEL REQUEST\n")
-
-    loading = await get_reply(update).reply_text(
-        "```\n⏳  Đang hủy yêu cầu...\n```",
-        parse_mode=ParseMode.MARKDOWN_V2
-    )
-
+        return await get_reply(update).reply_text("```\n⚠️  Cú pháp: /cancelreq <token>\n```", parse_mode=ParseMode.MARKDOWN_V2)
+    token   = await convert_eat_to_access(ctx.args[0].strip())
+    loading = await get_reply(update).reply_text("```\n⏳  Đang hủy yêu cầu...\n```", parse_mode=ParseMode.MARKDOWN_V2)
     try:
-        loop = asyncio.get_event_loop()
-
-        def _cancel():
-            url = f"{GARENA_BIND_URL}/game/account_security/bind:cancel"
-            data = {
-                "app_id": "10007",
-                "access_token": token
-            }
-            headers = GARENA_BIND_HEADERS
-
-            try:
-                res = requests.post(url, data=data, headers=headers, timeout=15)
-                return res.json()
-            except Exception as e:
-                return {"result": -1, "error": str(e)}
-
-        d = await loop.run_in_executor(None, _cancel)
-
-        ok = d.get("result") == 0
-        msg = "Đã hủy yêu cầu thành công!" if ok else str(d)
-
+        d  = await garena_post("/game/account_security/bind:cancel", {
+            "app_id": "100067", "access_token": token
+        })
+        ok  = d.get("result") == 0
+        msg = "Đã hủy thành công!" if ok else str(d)
         await loading.delete()
         await get_reply(update).reply_text(
             f"```\n┌───⭓ HỦY YÊU CẦU\n│  {'✅' if ok else '❌'}  {msg}\n└──────────────────\n```",
-            parse_mode=ParseMode.MARKDOWN_V2
-        )
-
+            parse_mode=ParseMode.MARKDOWN_V2)
     except Exception as e:
-        try:
-            await loading.delete()
-        except:
-            pass
-
-        await get_reply(update).reply_text(
-            f"```\n❌  Lỗi: {str(e)[:100]}\n```",
-            parse_mode=ParseMode.MARKDOWN_V2
-    )
+        try: await loading.delete()
+        except: pass
+        await get_reply(update).reply_text(f"```\n❌  Lỗi: {str(e)[:100]}\n```", parse_mode=ParseMode.MARKDOWN_V2)
+    
         
 async def cmd_sendotp(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     uid = str(update.effective_user.id)
@@ -4223,7 +4178,7 @@ if __name__ == "__main__":
         ("exportvip", cmd_exportvip),
         ("info", cmd_info),
         ("dxuat", cmd_dxuat),
-       #("addmail", cmd_addmail),
+        ("bindmail", cmd_bindmail),
         ("setspam", cmd_setspam),
         ("checkupdate", cmd_checkupdate),
         ("exporttoken", cmd_exporttoken),
